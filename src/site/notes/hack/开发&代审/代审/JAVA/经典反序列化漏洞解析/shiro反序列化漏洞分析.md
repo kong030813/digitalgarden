@@ -1,9 +1,13 @@
 ---
-{"dg-publish":true,"permalink":"/hack/开发&代审/代审/JAVA/经典反序列化漏洞解析/shiro反序列化漏洞分析/"}
+{"dg-publish":true,"permalink":"/hack/开发&代审/代审/JAVA/经典反序列化漏洞解析/shiro反序列化漏洞分析/","tags":["shiro"]}
 ---
 
+### 前言
+
+相信大家在找工作还是hvv面试的时候，<font color="#ff0000">shiro反序列化</font>这种标志性的漏洞是最常问的，我们应该大都是通过背漏洞原理来蒙混过关，最近恰好小迪分析了shiro反序列化漏洞，我也跟着搭建环境，深入的了解了一下这个漏洞的原理。
+
 ### **环境配置**
-idea+tomcat9+jdk1.8+shiro示例代码
+idea+tomcat9+jdk1.8+shiro1.2.4示例代码
 下载：https://github.com/apache/shiro/releases
 示例代码位置
 ![](https://s2.loli.net/2023/12/02/KQ1fSBulomzVOr9.png)
@@ -64,21 +68,9 @@ public T deserialize(byte[] serialized) throws SerializationException {
 ```
 跟踪到AbstractRememberMeManager.java中的convertBytesToPrincipals方法调用了deserialize
 ![](https://s2.loli.net/2023/12/03/Uqjb92tdToLAwcS.png)
-代码注解
-```java
-protected PrincipalCollection convertBytesToPrincipals(byte[] bytes, SubjectContext subjectContext) {
-    // 检查是否配置了 CipherService（加密服务）
-    if (getCipherService() != null) {
-        // 如果配置了加密服务，则对字节数组进行解密
-        bytes = decrypt(bytes);
-    }
-
-    // 调用 deserialize 方法将字节数组反序列化为 PrincipalCollection 对象
-    return deserialize(bytes);
-}
-```
+可以看到传入了bytes参数
 #### 跟踪漏洞点传入的参数是否为用户可控
-继续跟进看看bytes是否可控
+跟进看看bytes是否可控
 同文件下的getRememberedPrincipals方法定义了bytes然后调用convertBytesToPrincipals方法给bytes解密
 ![](https://s2.loli.net/2023/12/03/fnAgMpDwCHtbO8Y.png)
 DefaultSecurityManager.java文件中的getRememberedIdentity方法调用了getRememberedPrincipals
@@ -140,6 +132,10 @@ DefaultSecurityManager.java文件中的getRememberedIdentity方法调用了getRe
 ![](https://s2.loli.net/2023/12/03/G6S8f4eCB9wcs2r.png)
 那我们构造payload就要进行base64编码
 #### 整个流程
-那么整个流程就很清晰了
+再回到漏洞原理就已经彻底理解了
 <font color="#ff0000">客户端：恶意序列化payload-->AES加密-->BASE64编码-->通过cookie中的rememberme字段传入</font>
 <font color="#ff0000">服务端：接受到cookie中的rememberme字段数据-->BASE64解码-->AES解密-->反序列化恶意payload</font>
+
+### 文末
+感谢各位师傅们能看到文末。
+接下来就是寻找反序列化链条执行命令，下篇再进行分析～
